@@ -1,0 +1,95 @@
+{% extends "users/dashboard_base.html" %}
+
+{% block title %}AI Financial Assistant - AccountAI{% endblock %}
+{% block nav_ai %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>AI Financial Assistant</h1>
+    <p>Ask anything about your finances and get an instant AI-powered analysis.</p>
+</div>
+
+<div class="card">
+    <form method="POST">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="id_question">Ask a question</label>
+            <input
+                type="text"
+                name="question"
+                required
+                class="form-control"
+                id="id_question"
+                autocomplete="off"
+                placeholder="e.g. 'What were my highest expenses this month?' or 'Give me a summary of my cash flow'">
+        </div>
+
+        <button type="submit" class="btn-primary" style="background: linear-gradient(135deg, #8b5cf6, #06b6d4);">
+            Ask AI
+        </button>
+    </form>
+</div>
+
+{% if ai_response %}
+<div class="card" style="margin-top: 30px;">
+    {% if orchestration %}
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px;">
+        <span class="meta-chip">{{ orchestration.report_label }}</span>
+        <span class="meta-chip">{{ orchestration.period.label }}</span>
+        <span class="meta-chip">{{ orchestration.report_data.transaction_count }} transaction{{ orchestration.report_data.transaction_count|pluralize }}</span>
+    </div>
+    {% endif %}
+
+    <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 20px;">AI Analysis</h3>
+    <div class="ai-response-content">
+        {{ ai_response|safe }}
+    </div>
+</div>
+{% endif %}
+
+<style>
+    .meta-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(139, 92, 246, 0.12);
+        border: 1px solid rgba(139, 92, 246, 0.25);
+        color: #ddd6fe;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }
+
+    .ai-response-content {
+        line-height: 1.6;
+        color: var(--text-main);
+        font-size: 15px;
+    }
+
+    .ai-response-content h3 {
+        color: var(--primary);
+        font-size: 18px;
+        margin-top: 24px;
+        margin-bottom: 12px;
+    }
+
+    .ai-response-content p {
+        margin-bottom: 16px;
+    }
+
+    .ai-response-content ul,
+    .ai-response-content ol {
+        margin-bottom: 16px;
+        padding-left: 24px;
+    }
+
+    .ai-response-content li {
+        margin-bottom: 8px;
+    }
+
+    .ai-response-content strong {
+        color: white;
+    }
+</style>
+{% endblock %}

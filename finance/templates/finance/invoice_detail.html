@@ -1,0 +1,365 @@
+{% extends "users/dashboard_base.html" %}
+
+{% block title %}Invoice {{ invoice.invoice_number }} - AccountAI{% endblock %}
+{% block nav_invoices %}active{% endblock %}
+
+{% block content %}
+
+<!-- Action Bar -->
+<div class="action-bar">
+    <a href="{% url 'finance:invoice_list' %}" class="back-link">← Back to Invoices</a>
+    <div class="action-buttons">
+        <!-- Status Change Buttons -->
+        <form method="POST" style="display: inline-flex; gap: 8px; flex-wrap: wrap;">
+            {% csrf_token %}
+            {% if invoice.status == 'draft' %}
+                <button type="submit" name="new_status" value="sent" class="btn-status btn-status-sent">Mark as Sent</button>
+            {% endif %}
+            {% if invoice.status == 'sent' or invoice.status == 'overdue' %}
+                <button type="submit" name="new_status" value="paid" class="btn-status btn-status-paid">Mark as Paid</button>
+            {% endif %}
+            {% if invoice.status == 'sent' %}
+                <button type="submit" name="new_status" value="overdue" class="btn-status btn-status-overdue">Mark Overdue</button>
+            {% endif %}
+            {% if invoice.status == 'paid' %}
+                <button type="submit" name="new_status" value="draft" class="btn-status btn-status-draft">Revert to Draft</button>
+            {% endif %}
+        </form>
+        <a href="{% url 'finance:invoice_edit' invoice.id %}" class="btn-action">✏️ Edit</a>
+        <a href="{% url 'finance:invoice_pdf' invoice.id %}" class="btn-action btn-action-primary">📄 Download PDF</a>
+        <form method="POST" action="{% url 'finance:invoice_delete' invoice.id %}"
+              onsubmit="return confirm('Delete invoice {{ invoice.invoice_number }}? This cannot be undone.');"
+              style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn-action btn-action-danger">🗑 Delete</button>
+        </form>
+    </div>
+</div>
+
+<!-- Invoice Card -->
+<div class="invoice-card">
+    <!-- Header -->
+    <div class="inv-header">
+        <div class="inv-company">
+            <h2>{{ profile.company_name }}</h2>
+            {% if profile.company_address %}<p class="pre-line">{{ profile.company_address }}</p>{% endif %}
+            {% if profile.company_phone %}<p>Phone: {{ profile.company_phone }}</p>{% endif %}
+            {% if profile.company_email %}<p>{{ profile.company_email }}</p>{% endif %}
+            {% if profile.gstin %}<p>GSTIN: {{ profile.gstin }}</p>{% endif %}
+        </div>
+        <div class="inv-meta">
+            <h1 class="inv-number">{{ invoice.invoice_number }}</h1>
+            <span class="status-badge status-{{ invoice.status }}">{{ invoice.get_status_display }}</span>
+            <div class="inv-dates">
+                <div><span class="date-label">Issue:</span> {{ invoice.issue_date|date:"M d, Y" }}</div>
+                <div><span class="date-label">Due:</span> {{ invoice.due_date|date:"M d, Y" }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="inv-divider"></div>
+
+    <!-- Bill To -->
+    <div class="inv-bill-to">
+        <h4>Bill To</h4>
+        <p class="client-name">{{ invoice.client_name }}</p>
+        {% if invoice.client_address %}<p class="pre-line">{{ invoice.client_address }}</p>{% endif %}
+        {% if invoice.client_email %}<p>{{ invoice.client_email }}</p>{% endif %}
+        {% if invoice.client_gstin %}<p>GSTIN: {{ invoice.client_gstin }}</p>{% endif %}
+    </div>
+
+    <!-- Line Items Table -->
+    <div class="items-table-wrapper">
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 40px;">#</th>
+                    <th>Description</th>
+                    <th style="text-align: right;">Qty</th>
+                    <th style="text-align: right;">Unit Price</th>
+                    <th style="text-align: right;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ item.description }}</td>
+                    <td style="text-align: right;">{{ item.quantity|floatformat:2 }}</td>
+                    <td style="text-align: right;">{{ profile.currency }}{{ item.unit_price|floatformat:2 }}</td>
+                    <td style="text-align: right; font-weight: 600;">{{ profile.currency }}{{ item.amount|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Totals -->
+    <div class="inv-totals">
+        <div class="totals-block">
+            <div class="total-line">
+                <span>Subtotal</span>
+                <span>{{ profile.currency }}{{ invoice.subtotal|floatformat:2 }}</span>
+            </div>
+            {% if invoice.tax_type == 'gst' %}
+            <div class="total-line">
+                <span>GST ({{ invoice.tax_rate }}%)</span>
+                <span>{{ profile.currency }}{{ invoice.tax_amount|floatformat:2 }}</span>
+            </div>
+            {% elif invoice.tax_type == 'cgst_sgst' %}
+            <div class="total-line">
+                <span>CGST ({{ invoice.cgst_rate }}%)</span>
+                <span>{{ profile.currency }}{{ cgst_amount|floatformat:2 }}</span>
+            </div>
+            <div class="total-line">
+                <span>SGST ({{ invoice.sgst_rate }}%)</span>
+                <span>{{ profile.currency }}{{ sgst_amount|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+            <div class="total-line total-grand">
+                <span>Total</span>
+                <span>{{ profile.currency }}{{ invoice.total|floatformat:2 }}</span>
+            </div>
+        </div>
+    </div>
+
+    {% if profile.bank_name or profile.bank_account %}
+    <div class="inv-divider"></div>
+    <div class="inv-bank">
+        <h4>Bank Details</h4>
+        {% if profile.bank_name %}<p>Bank: {{ profile.bank_name }}</p>{% endif %}
+        {% if profile.bank_account %}<p>Account: {{ profile.bank_account }}</p>{% endif %}
+        {% if profile.bank_ifsc %}<p>IFSC: {{ profile.bank_ifsc }}</p>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if invoice.notes %}
+    <div class="inv-divider"></div>
+    <div class="inv-notes">
+        <h4>Notes / Terms</h4>
+        <p class="pre-line">{{ invoice.notes }}</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .action-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 28px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+    .back-link {
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 500;
+        transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--primary); }
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .btn-action {
+        padding: 9px 18px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--glass-border);
+        border-radius: 10px;
+        color: var(--text-main);
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .btn-action:hover { background: rgba(255, 255, 255, 0.1); }
+    .btn-action-primary {
+        background: var(--primary);
+        border-color: var(--primary);
+    }
+    .btn-action-primary:hover {
+        background: var(--primary-hover);
+        transform: translateY(-1px);
+    }
+    .btn-action-danger {
+        background: rgba(239, 68, 68, 0.08);
+        border-color: rgba(239, 68, 68, 0.2);
+        color: var(--error);
+    }
+    .btn-action-danger:hover { background: rgba(239, 68, 68, 0.16); }
+
+    .btn-status {
+        padding: 8px 16px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid;
+    }
+    .btn-status-sent {
+        background: rgba(59, 130, 246, 0.1);
+        border-color: rgba(59, 130, 246, 0.3);
+        color: #60a5fa;
+    }
+    .btn-status-paid {
+        background: rgba(16, 185, 129, 0.1);
+        border-color: rgba(16, 185, 129, 0.3);
+        color: #34d399;
+    }
+    .btn-status-overdue {
+        background: rgba(239, 68, 68, 0.1);
+        border-color: rgba(239, 68, 68, 0.3);
+        color: #f87171;
+    }
+    .btn-status-draft {
+        background: rgba(148, 163, 184, 0.1);
+        border-color: rgba(148, 163, 184, 0.3);
+        color: #94a3b8;
+    }
+
+    /* Invoice Card */
+    .invoice-card {
+        background: rgba(255, 255, 255, 0.035);
+        border: 1px solid var(--glass-border);
+        border-radius: 20px;
+        padding: 40px;
+        max-width: 900px;
+    }
+    .inv-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        flex-wrap: wrap;
+    }
+    .inv-company h2 {
+        font-size: 20px;
+        font-weight: 700;
+        margin-bottom: 8px;
+        background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    .inv-company p {
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.5;
+    }
+    .inv-meta {
+        text-align: right;
+    }
+    .inv-number {
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+    .status-badge {
+        display: inline-block;
+        padding: 4px 14px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 12px;
+    }
+    .status-draft {
+        background: rgba(148, 163, 184, 0.12); border: 1px solid rgba(148, 163, 184, 0.25); color: #94a3b8;
+    }
+    .status-sent {
+        background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.25); color: #60a5fa;
+    }
+    .status-paid {
+        background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); color: #34d399;
+    }
+    .status-overdue {
+        background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.25); color: #f87171;
+    }
+    .inv-dates {
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.8;
+    }
+    .date-label {
+        font-weight: 600;
+        color: var(--text-main);
+    }
+
+    .inv-divider {
+        height: 1px;
+        background: var(--glass-border);
+        margin: 28px 0;
+    }
+
+    .inv-bill-to { margin-bottom: 28px; }
+    .inv-bill-to h4, .inv-bank h4, .inv-notes h4 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--text-muted);
+        margin-bottom: 10px;
+    }
+    .client-name {
+        font-size: 17px;
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+    .inv-bill-to p, .inv-bank p, .inv-notes p {
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.6;
+    }
+    .pre-line { white-space: pre-line; }
+
+    .items-table-wrapper { overflow-x: auto; margin-bottom: 24px; }
+    .items-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .items-table th {
+        text-align: left;
+        padding: 12px 16px;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: var(--text-muted);
+        border-bottom: 1px solid var(--glass-border);
+    }
+    .items-table td {
+        padding: 14px 16px;
+        font-size: 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .inv-totals {
+        display: flex;
+        justify-content: flex-end;
+    }
+    .totals-block { width: 280px; }
+    .total-line {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        font-size: 14px;
+        color: var(--text-muted);
+    }
+    .total-grand {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--text-main);
+        border-top: 1px solid var(--glass-border);
+        padding-top: 14px;
+        margin-top: 6px;
+    }
+
+    @media (max-width: 768px) {
+        .invoice-card { padding: 24px 18px; }
+        .inv-header { flex-direction: column; }
+        .inv-meta { text-align: left; }
+    }
+</style>
+{% endblock %}

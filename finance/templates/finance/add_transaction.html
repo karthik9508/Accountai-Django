@@ -1,0 +1,218 @@
+{% extends "users/dashboard_base.html" %}
+
+{% block title %}AI Transaction Entry - AccountAI{% endblock %}
+{% block nav_transaction %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Record Transaction</h1>
+    <p>Describe your transaction naturally, review the AI result, and save only after you confirm it.</p>
+</div>
+
+<div class="card">
+    <form method="POST">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="parse">
+
+        <div class="form-group">
+            <label for="id_description">What happened?</label>
+            <textarea
+                name="description"
+                class="form-control"
+                rows="3"
+                required
+                id="id_description"
+                placeholder="e.g. 'Paid Rs 5,000 for electricity bill' or 'Received Rs 15,000 from client John for web design'"
+                style="resize: vertical;">{{ original_description }}</textarea>
+        </div>
+
+        <button type="submit" class="btn-primary btn-success">
+            Process with AI
+        </button>
+    </form>
+</div>
+
+{% if draft %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 20px; flex-wrap: wrap;">
+        <div>
+            <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 6px;">Review Before Saving</h3>
+            <p style="color: var(--text-muted); font-size: 14px;">AI detected these details from your message. You can edit anything before recording the transaction.</p>
+        </div>
+        <span class="review-chip">Pending Save</span>
+    </div>
+
+    <form method="POST">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save">
+        <input type="hidden" name="original_description" value="{{ original_description }}">
+
+        <div class="review-grid">
+            <div class="form-group">
+                <label for="id_final_description">Description</label>
+                <input type="text" name="description" id="id_final_description" class="form-control" value="{{ draft.description }}" required>
+            </div>
+
+            <div class="form-group">
+                <label for="id_type">Transaction Type</label>
+                <select name="type" id="id_type" class="form-control" required>
+                    <option value="income" {% if draft.type == 'income' %}selected{% endif %}>Income</option>
+                    <option value="expense" {% if draft.type == 'expense' %}selected{% endif %}>Expense</option>
+                    <option value="asset" {% if draft.type == 'asset' %}selected{% endif %}>Asset</option>
+                    <option value="liability" {% if draft.type == 'liability' %}selected{% endif %}>Liability</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="id_category_name">Category</label>
+                <input type="text" name="category_name" id="id_category_name" class="form-control" value="{{ draft.category_name }}" required>
+            </div>
+
+            <div class="form-group">
+                <label for="id_account_name">Account</label>
+                <input type="text" name="account_name" id="id_account_name" class="form-control" value="{{ draft.account_name }}" required>
+            </div>
+
+            <div class="form-group">
+                <label for="id_amount">Amount</label>
+                <input type="number" name="amount" id="id_amount" class="form-control" value="{{ draft.amount }}" step="0.01" min="0.01" required>
+            </div>
+
+            <div class="form-group">
+                <label for="id_date">Date</label>
+                <input type="date" name="date" id="id_date" class="form-control" value="{{ draft.date }}" required>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px;">
+            <button type="submit" class="btn-primary">Save Transaction</button>
+            <a href="{% url 'finance:add_transaction' %}" class="btn-secondary">Discard</a>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
+        <h3 style="font-size: 18px; font-weight: 600;">Recent Entries</h3>
+        <a href="{% url 'finance:all_transactions' %}" class="btn-secondary">View All Transactions</a>
+    </div>
+
+    {% for t in transactions %}
+        <div class="transaction-row">
+            <div>
+                <p style="font-weight: 600; font-size: 15px;">{{ t.description }}</p>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px; display: flex; gap: 10px; flex-wrap: wrap;">
+                    <span class="meta-pill">{{ t.account.name }}</span>
+                    <span class="type-pill">{{ t.type|title }}</span>
+                    <span>{{ t.date|date:"M d, Y" }}</span>
+                </div>
+            </div>
+
+            <div class="txn-amount {% if t.type == 'income' %}txn-income{% else %}txn-expense{% endif %}">
+                {% if t.type == 'expense' %}-{% else %}+{% endif %}{{ currency }}{{ t.amount }}
+            </div>
+
+            <div class="transaction-actions">
+                {% if t.type == 'income' %}
+                <a
+                    href="{% url 'finance:invoice_create' %}?transaction_id={{ t.id }}"
+                    class="btn-secondary btn-icon"
+                    title="Generate Invoice"
+                    aria-label="Generate Invoice"
+                    style="margin-right: 6px;">&#128462;</a>
+                {% endif %}
+                <a
+                    href="{% url 'finance:edit_transaction' t.id %}"
+                    class="btn-secondary btn-icon"
+                    title="Edit transaction"
+                    aria-label="Edit transaction">&#9998;</a>
+            </div>
+        </div>
+    {% empty %}
+        <p style="text-align: center; color: var(--text-muted); font-size: 14px; padding: 20px 0;">No transactions recorded yet. Use the form above to add your first one.</p>
+    {% endfor %}
+</div>
+
+<style>
+    .review-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 18px;
+    }
+
+    .review-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 7px 12px;
+        border-radius: 999px;
+        background: rgba(245, 158, 11, 0.14);
+        border: 1px solid rgba(245, 158, 11, 0.28);
+        color: #fcd34d;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .btn-secondary {
+        display: inline-block;
+        padding: 12px 28px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text-main);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        font-size: 15px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+
+    .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-icon {
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        font-size: 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .transaction-row {
+        background: rgba(0, 0, 0, 0.15);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        gap: 16px;
+    }
+
+    .transaction-actions {
+        display: flex;
+        align-items: center;
+    }
+
+    .meta-pill {
+        background: rgba(139, 92, 246, 0.1);
+        border: 1px solid rgba(139, 92, 246, 0.2);
+        padding: 3px 10px;
+        border-radius: 6px;
+    }
+
+    .type-pill {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 3px 10px;
+        border-radius: 6px;
+    }
+
+    @media (max-width: 768px) {
+        .transaction-row {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}

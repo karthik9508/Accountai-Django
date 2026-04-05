@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AccountAI{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --sidebar-width: 260px;
+            --sidebar-bg: #0f172a;
+            --sidebar-hover: rgba(139, 92, 246, 0.15);
+            --sidebar-active: rgba(139, 92, 246, 0.25);
+            --sidebar-border: rgba(255, 255, 255, 0.06);
+            --primary: #8b5cf6;
+            --primary-hover: #7c3aed;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --bg-main: #0f172a;
+            --bg-content: #1e293b;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background: var(--bg-main);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--sidebar-border);
+            position: fixed;
+            top: 0;
+            left: 0;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .sidebar-brand {
+            padding: 24px 20px;
+            border-bottom: 1px solid var(--sidebar-border);
+        }
+
+        .sidebar-brand h2 {
+            font-size: 22px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .sidebar-brand p {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 16px 12px;
+            overflow-y: auto;
+        }
+
+        .nav-section-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            padding: 12px 12px 8px;
+            opacity: 0.6;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 11px 14px;
+            border-radius: 10px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            margin-bottom: 2px;
+        }
+
+        .nav-item:hover {
+            background: var(--sidebar-hover);
+            color: var(--text-main);
+            transform: translateX(3px);
+        }
+
+        .nav-item.active {
+            background: var(--sidebar-active);
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .nav-item .icon {
+            font-size: 18px;
+            width: 24px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .sidebar-footer {
+            padding: 16px 12px;
+            border-top: 1px solid var(--sidebar-border);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .user-details .name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .user-details .role {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .logout-btn {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.15);
+            border-radius: 10px;
+            color: var(--error);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .logout-btn:hover {
+            background: rgba(239, 68, 68, 0.15);
+        }
+
+        .sidebar-toggle {
+            display: none;
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 200;
+            background: var(--primary);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .main-content {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            min-height: 100vh;
+            padding: 32px;
+        }
+
+        .page-header {
+            margin-bottom: 32px;
+        }
+
+        .page-header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .page-header p {
+            color: var(--text-muted);
+            font-size: 15px;
+        }
+
+        .card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            color: white;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            outline: none;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
+        }
+
+        .btn-primary {
+            display: inline-block;
+            padding: 12px 28px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px -8px var(--primary);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+
+        .btn-success:hover {
+            box-shadow: 0 8px 20px -8px #10b981;
+        }
+
+        .alert {
+            padding: 14px 18px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .alert-error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: var(--error);
+        }
+
+        .txn-amount {
+            font-weight: 700;
+            font-size: 18px;
+            white-space: nowrap;
+            margin-left: 20px;
+        }
+
+        .txn-income {
+            color: var(--success);
+        }
+
+        .txn-expense {
+            color: var(--error);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .sidebar-toggle {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding: 20px;
+                padding-top: 60px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="sidebar-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <h2>AccountAI</h2>
+            <p>AI-Powered ERP</p>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section-label">Main</div>
+            <a href="{% url 'users:home' %}" class="nav-item {% block nav_home %}{% endblock %}">
+                <span class="icon">&#8962;</span> Dashboard
+            </a>
+            <a href="{% url 'finance:add_transaction' %}" class="nav-item {% block nav_transaction %}{% endblock %}">
+                <span class="icon">&#10024;</span> AI Transaction
+            </a>
+            <a href="{% url 'finance:all_transactions' %}" class="nav-item {% block nav_transactions_all %}{% endblock %}">
+                <span class="icon">&#128221;</span> Transactions
+            </a>
+
+            <div class="nav-section-label" style="margin-top: 16px;">Reports</div>
+            <a href="{% url 'finance:profit_loss' %}" class="nav-item {% block nav_pnl %}{% endblock %}">
+                <span class="icon">&#128202;</span> Profit &amp; Loss
+            </a>
+            <a href="{% url 'finance:balance_sheet' %}" class="nav-item {% block nav_bs %}{% endblock %}">
+                <span class="icon">&#128203;</span> Balance Sheet
+            </a>
+            <a href="{% url 'finance:cash_flow' %}" class="nav-item {% block nav_cf %}{% endblock %}">
+                <span class="icon">&#128176;</span> Cash Flow
+            </a>
+
+            <div class="nav-section-label" style="margin-top: 16px;">Tools</div>
+            <a href="{% url 'finance:invoice_list' %}" class="nav-item {% block nav_invoices %}{% endblock %}">
+                <span class="icon">&#128230;</span> Invoices
+            </a>
+            <a href="{% url 'finance:ai_report' %}" class="nav-item {% block nav_ai %}{% endblock %}">
+                <span class="icon">&#129302;</span> AI Assistant
+            </a>
+
+            <div class="nav-section-label" style="margin-top: 16px;">Settings</div>
+            <a href="{% url 'finance:business_profile' %}" class="nav-item {% block nav_settings %}{% endblock %}">
+                <span class="icon">&#9881;</span> Business Profile
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar">{{ user.username|first|upper }}</div>
+                <div class="user-details">
+                    <div class="name">{{ user.username }}</div>
+                    <div class="role">Admin</div>
+                </div>
+            </div>
+            <form method="POST" action="{% url 'users:logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="logout-btn">Sign Out</button>
+            </form>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-error{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

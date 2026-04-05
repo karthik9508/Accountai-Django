@@ -1,0 +1,411 @@
+{% extends "users/dashboard_base.html" %}
+
+{% block title %}{% if edit_mode %}Edit Invoice {{ invoice.invoice_number }}{% else %}Create Invoice{% endif %} - AccountAI{% endblock %}
+{% block nav_invoices %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{% if edit_mode %}Edit Invoice {{ invoice.invoice_number }}{% else %}Create Invoice{% endif %}</h1>
+    <p>{% if edit_mode %}Update invoice details and line items.{% else %}Fill in client details and line items to generate an invoice.{% endif %}</p>
+</div>
+
+<!-- Company Info (read-only from profile) -->
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+        <div>
+            <h3 class="card-title">From: {{ profile.company_name }}</h3>
+            {% if profile.company_address %}<p class="text-muted" style="font-size: 13px; white-space: pre-line;">{{ profile.company_address }}</p>{% endif %}
+            {% if profile.gstin %}<p class="text-muted" style="font-size: 13px;">GSTIN: {{ profile.gstin }}</p>{% endif %}
+        </div>
+        <div style="text-align: right;">
+            {% if profile.tax_type == 'gst' %}
+                <span class="tax-chip">GST {{ profile.tax_rate }}%</span>
+            {% elif profile.tax_type == 'cgst_sgst' %}
+                <span class="tax-chip">CGST {{ profile.cgst_rate }}% + SGST {{ profile.sgst_rate }}%</span>
+            {% else %}
+                <span class="tax-chip tax-none">No Tax</span>
+            {% endif %}
+            <a href="{% url 'finance:business_profile' %}" class="edit-profile-link">Edit Profile →</a>
+        </div>
+    </div>
+</div>
+
+<form method="POST" id="invoiceForm">
+    {% csrf_token %}
+    {% if transaction %}
+        <input type="hidden" name="transaction_id" value="{{ transaction.id }}">
+    {% endif %}
+
+    <!-- Client Details -->
+    <div class="card">
+        <h3 class="card-title">Client Details</h3>
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="id_client_name">Client Name *</label>
+                <input type="text" name="client_name" id="id_client_name" class="form-control"
+                       value="{{ defaults.client_name }}" required>
+            </div>
+            <div class="form-group">
+                <label for="id_client_email">Client Email</label>
+                <input type="email" name="client_email" id="id_client_email" class="form-control"
+                       value="{{ defaults.client_email }}">
+            </div>
+            <div class="form-group">
+                <label for="id_client_gstin">Client GSTIN</label>
+                <input type="text" name="client_gstin" id="id_client_gstin" class="form-control"
+                       value="{{ defaults.client_gstin }}">
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="id_client_address">Client Address</label>
+            <textarea name="client_address" id="id_client_address" class="form-control" rows="2"
+                      style="resize: vertical;">{{ defaults.client_address }}</textarea>
+        </div>
+    </div>
+
+    <!-- Dates & Status -->
+    <div class="card">
+        <h3 class="card-title">Invoice Details</h3>
+        <div class="form-grid-3">
+            <div class="form-group">
+                <label for="id_issue_date">Issue Date *</label>
+                <input type="date" name="issue_date" id="id_issue_date" class="form-control"
+                       value="{{ defaults.issue_date }}" required>
+            </div>
+            <div class="form-group">
+                <label for="id_due_date">Due Date *</label>
+                <input type="date" name="due_date" id="id_due_date" class="form-control"
+                       value="{{ defaults.due_date }}" required>
+            </div>
+            <div class="form-group">
+                <label for="id_status">Status</label>
+                <select name="status" id="id_status" class="form-control">
+                    <option value="draft" {% if defaults.status == 'draft' %}selected{% endif %}>Draft</option>
+                    <option value="sent" {% if defaults.status == 'sent' %}selected{% endif %}>Sent</option>
+                    <option value="paid" {% if defaults.status == 'paid' %}selected{% endif %}>Paid</option>
+                    <option value="overdue" {% if defaults.status == 'overdue' %}selected{% endif %}>Overdue</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Line Items -->
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+            <h3 class="card-title" style="margin-bottom: 0;">Line Items</h3>
+            <button type="button" onclick="addRow()" class="btn-add-row">+ Add Item</button>
+        </div>
+
+        <div class="line-items-header">
+            <span class="li-desc">Description</span>
+            <span class="li-qty">Qty</span>
+            <span class="li-price">Unit Price</span>
+            <span class="li-amount">Amount</span>
+            <span class="li-action"></span>
+        </div>
+
+        <div id="line-items-container">
+            <!-- Rows populated by JS -->
+        </div>
+
+        <!-- Totals -->
+        <div class="totals-section">
+            <div class="total-row">
+                <span>Subtotal</span>
+                <span id="display-subtotal">{{ profile.currency }}0.00</span>
+            </div>
+            {% if profile.tax_type == 'gst' %}
+            <div class="total-row">
+                <span>GST ({{ profile.tax_rate }}%)</span>
+                <span id="display-tax">{{ profile.currency }}0.00</span>
+            </div>
+            {% elif profile.tax_type == 'cgst_sgst' %}
+            <div class="total-row">
+                <span>CGST ({{ profile.cgst_rate }}%)</span>
+                <span id="display-cgst">{{ profile.currency }}0.00</span>
+            </div>
+            <div class="total-row">
+                <span>SGST ({{ profile.sgst_rate }}%)</span>
+                <span id="display-sgst">{{ profile.currency }}0.00</span>
+            </div>
+            {% endif %}
+            <div class="total-row total-grand">
+                <span>Total</span>
+                <span id="display-total">{{ profile.currency }}0.00</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="card">
+        <h3 class="card-title">Notes / Terms</h3>
+        <div class="form-group" style="margin-bottom: 0;">
+            <textarea name="notes" id="id_notes" class="form-control" rows="3"
+                      placeholder="e.g. Payment due within 30 days. Thank you for your business!"
+                      style="resize: vertical;">{{ defaults.notes }}</textarea>
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <button type="submit" class="btn-primary">{% if edit_mode %}Update Invoice{% else %}Create Invoice{% endif %}</button>
+        {% if edit_mode %}
+            <a href="{% url 'finance:invoice_detail' invoice.id %}" class="btn-secondary">Cancel</a>
+        {% else %}
+            <a href="{% url 'finance:invoice_list' %}" class="btn-secondary">Cancel</a>
+        {% endif %}
+    </div>
+</form>
+
+<style>
+    .card-title {
+        font-size: 17px;
+        font-weight: 600;
+        margin-bottom: 20px;
+    }
+    .text-muted { color: var(--text-muted); }
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 18px;
+    }
+    .form-grid-3 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 18px;
+    }
+    .tax-chip {
+        display: inline-block;
+        padding: 5px 14px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        background: rgba(139, 92, 246, 0.12);
+        border: 1px solid rgba(139, 92, 246, 0.25);
+        color: #a78bfa;
+    }
+    .tax-chip.tax-none {
+        background: rgba(148, 163, 184, 0.1);
+        border-color: rgba(148, 163, 184, 0.2);
+        color: #94a3b8;
+    }
+    .edit-profile-link {
+        display: block;
+        margin-top: 8px;
+        font-size: 12px;
+        color: var(--text-muted);
+        text-decoration: none;
+    }
+    .edit-profile-link:hover {
+        color: var(--primary);
+    }
+
+    .btn-add-row {
+        padding: 8px 18px;
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.25);
+        color: var(--success);
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .btn-add-row:hover {
+        background: rgba(16, 185, 129, 0.18);
+    }
+
+    .line-items-header {
+        display: grid;
+        grid-template-columns: 1fr 90px 130px 130px 42px;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--glass-border);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-muted);
+    }
+    .li-qty, .li-price, .li-amount { text-align: right; }
+
+    .line-item-row {
+        display: grid;
+        grid-template-columns: 1fr 90px 130px 130px 42px;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        align-items: center;
+        animation: fadeSlide 0.2s ease;
+    }
+    .line-item-row input {
+        width: 100%;
+        padding: 10px 12px;
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--glass-border);
+        border-radius: 10px;
+        color: white;
+        font-size: 14px;
+        outline: none;
+        font-family: 'Outfit', sans-serif;
+        transition: border-color 0.2s ease;
+    }
+    .line-item-row input:focus {
+        border-color: var(--primary);
+    }
+    .line-item-row input[type="number"] {
+        text-align: right;
+    }
+    .line-item-row .row-amount {
+        text-align: right;
+        font-weight: 600;
+        font-size: 14px;
+        padding-right: 4px;
+    }
+    .btn-remove-row {
+        width: 34px;
+        height: 34px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(239, 68, 68, 0.08);
+        border: 1px solid rgba(239, 68, 68, 0.15);
+        border-radius: 8px;
+        color: var(--error);
+        cursor: pointer;
+        font-size: 16px;
+        transition: all 0.2s ease;
+    }
+    .btn-remove-row:hover {
+        background: rgba(239, 68, 68, 0.18);
+    }
+
+    .totals-section {
+        margin-top: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+    }
+    .total-row {
+        display: flex;
+        justify-content: space-between;
+        width: 280px;
+        font-size: 14px;
+        color: var(--text-muted);
+    }
+    .total-grand {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text-main);
+        padding-top: 10px;
+        border-top: 1px solid var(--glass-border);
+    }
+
+    .btn-secondary {
+        display: inline-block;
+        padding: 12px 28px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text-main);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        font-size: 15px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+    .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    @keyframes fadeSlide {
+        from { opacity: 0; transform: translateY(-4px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 768px) {
+        .line-items-header { display: none; }
+        .line-item-row {
+            grid-template-columns: 1fr;
+            gap: 8px;
+            padding: 14px 0;
+        }
+        .line-item-row input[type="number"] { text-align: left; }
+    }
+</style>
+
+<script>
+    const TAX_TYPE = '{{ profile.tax_type }}';
+    const TAX_RATE = parseFloat('{{ profile.tax_rate }}') || 0;
+    const CGST_RATE = parseFloat('{{ profile.cgst_rate }}') || 0;
+    const SGST_RATE = parseFloat('{{ profile.sgst_rate }}') || 0;
+    const CUR = '{{ profile.currency }}';
+
+    const container = document.getElementById('line-items-container');
+    let rowCount = 0;
+
+    function addRow(desc = '', qty = '1', price = '') {
+        rowCount++;
+        const row = document.createElement('div');
+        row.className = 'line-item-row';
+        row.innerHTML = `
+            <input type="text" name="item_description" placeholder="Item description" value="${esc(desc)}" required>
+            <input type="number" name="item_quantity" placeholder="1" value="${esc(qty)}" step="0.01" min="0.01" oninput="recalc()">
+            <input type="number" name="item_unit_price" placeholder="0.00" value="${esc(price)}" step="0.01" min="0" oninput="recalc()">
+            <div class="row-amount">${CUR}0.00</div>
+            <button type="button" class="btn-remove-row" onclick="removeRow(this)" title="Remove">🗑</button>
+        `;
+        container.appendChild(row);
+        recalc();
+    }
+
+    function esc(s) {
+        return String(s).replace(/"/g, '&quot;');
+    }
+
+    function removeRow(btn) {
+        btn.closest('.line-item-row').remove();
+        recalc();
+        if (container.children.length === 0) addRow();
+    }
+
+    function recalc() {
+        let subtotal = 0;
+        container.querySelectorAll('.line-item-row').forEach(row => {
+            const qty = parseFloat(row.querySelector('[name="item_quantity"]').value) || 0;
+            const price = parseFloat(row.querySelector('[name="item_unit_price"]').value) || 0;
+            const amount = qty * price;
+            subtotal += amount;
+            row.querySelector('.row-amount').textContent = CUR + amount.toFixed(2);
+        });
+
+        document.getElementById('display-subtotal').textContent = CUR + subtotal.toFixed(2);
+
+        let taxAmount = 0;
+        if (TAX_TYPE === 'gst') {
+            taxAmount = subtotal * TAX_RATE / 100;
+            const el = document.getElementById('display-tax');
+            if (el) el.textContent = CUR + taxAmount.toFixed(2);
+        } else if (TAX_TYPE === 'cgst_sgst') {
+            const cgst = subtotal * CGST_RATE / 100;
+            const sgst = subtotal * SGST_RATE / 100;
+            taxAmount = cgst + sgst;
+            const cgstEl = document.getElementById('display-cgst');
+            const sgstEl = document.getElementById('display-sgst');
+            if (cgstEl) cgstEl.textContent = CUR + cgst.toFixed(2);
+            if (sgstEl) sgstEl.textContent = CUR + sgst.toFixed(2);
+        }
+
+        document.getElementById('display-total').textContent = CUR + (subtotal + taxAmount).toFixed(2);
+    }
+
+    // Initialize rows
+    {% if edit_mode and existing_items %}
+        {% for item in existing_items %}
+            addRow('{{ item.description|escapejs }}', '{{ item.quantity }}', '{{ item.unit_price }}');
+        {% endfor %}
+    {% elif defaults.item_description %}
+        addRow('{{ defaults.item_description|escapejs }}', '1', '{{ defaults.item_amount }}');
+    {% else %}
+        addRow();
+    {% endif %}
+</script>
+{% endblock %}

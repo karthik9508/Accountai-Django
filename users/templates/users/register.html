@@ -1,0 +1,53 @@
+{% extends "users/base.html" %}
+
+{% block title %}Create Account - AccountAI{% endblock %}
+
+{% block content %}
+<div class="auth-header">
+    <h1>Create Account</h1>
+    <p>Join AccountAI and get started</p>
+</div>
+
+<form method="POST">
+    {% csrf_token %}
+    
+    {% if form.non_field_errors %}
+        <div class="errorlist">
+            {% for error in form.non_field_errors %}
+                {{ error }}
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% for field in form %}
+        <div class="form-group">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}
+                <span class="helptext">{{ field.help_text|safe }}</span>
+            {% endif %}
+            {% for error in field.errors %}
+                <span class="errorlist" style="display:block; margin-top:5px; padding:5px;">{{ error }}</span>
+            {% endfor %}
+        </div>
+    {% endfor %}
+
+    <button type="submit" class="btn-primary">Sign Up</button>
+</form>
+
+<!-- A quick script to add our custom CSS classes to Django's default form inputs -->
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const inputs = document.querySelectorAll("input");
+        inputs.forEach(input => {
+            if (input.type !== 'submit' && input.type !== 'hidden') {
+                input.classList.add("form-control");
+            }
+        });
+    });
+</script>
+
+<div class="auth-links">
+    Already have an account? <a href="{% url 'users:login' %}">Sign in</a>
+</div>
+{% endblock %}

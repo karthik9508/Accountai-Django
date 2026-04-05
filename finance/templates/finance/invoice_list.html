@@ -1,0 +1,216 @@
+{% extends "users/dashboard_base.html" %}
+
+{% block title %}Invoices - AccountAI{% endblock %}
+{% block nav_invoices %}active{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+    <div>
+        <h1>Invoices</h1>
+        <p>Manage and track all your invoices.</p>
+    </div>
+    <a href="{% url 'finance:invoice_create' %}" class="btn-primary btn-success">+ New Invoice</a>
+</div>
+
+<!-- Status Filters -->
+<div class="filter-pills">
+    <a href="{% url 'finance:invoice_list' %}"
+       class="filter-pill {% if status_filter == 'all' %}active{% endif %}">
+        All <span class="pill-count">{{ totals.all }}</span>
+    </a>
+    <a href="{% url 'finance:invoice_list' %}?status=draft"
+       class="filter-pill {% if status_filter == 'draft' %}active{% endif %}">
+        Draft <span class="pill-count">{{ totals.draft }}</span>
+    </a>
+    <a href="{% url 'finance:invoice_list' %}?status=sent"
+       class="filter-pill {% if status_filter == 'sent' %}active{% endif %}">
+        Sent <span class="pill-count">{{ totals.sent }}</span>
+    </a>
+    <a href="{% url 'finance:invoice_list' %}?status=paid"
+       class="filter-pill {% if status_filter == 'paid' %}active{% endif %}">
+        Paid <span class="pill-count">{{ totals.paid }}</span>
+    </a>
+    <a href="{% url 'finance:invoice_list' %}?status=overdue"
+       class="filter-pill {% if status_filter == 'overdue' %}active{% endif %}">
+        Overdue <span class="pill-count">{{ totals.overdue }}</span>
+    </a>
+</div>
+
+<!-- Invoice Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-wrapper">
+        <table class="inv-table">
+            <thead>
+                <tr>
+                    <th>Invoice #</th>
+                    <th>Client</th>
+                    <th>Issue Date</th>
+                    <th>Due Date</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inv in invoices %}
+                <tr>
+                    <td>
+                        <a href="{% url 'finance:invoice_detail' inv.id %}" class="inv-link">{{ inv.invoice_number }}</a>
+                    </td>
+                    <td>{{ inv.client_name }}</td>
+                    <td>{{ inv.issue_date|date:"M d, Y" }}</td>
+                    <td>{{ inv.due_date|date:"M d, Y" }}</td>
+                    <td class="amount-cell">{{ profile.currency }}{{ inv.total|floatformat:2 }}</td>
+                    <td>
+                        <span class="status-badge status-{{ inv.status }}">{{ inv.get_status_display }}</span>
+                    </td>
+                    <td class="actions-cell">
+                        <a href="{% url 'finance:invoice_detail' inv.id %}" class="action-btn" title="View">👁</a>
+                        <a href="{% url 'finance:invoice_edit' inv.id %}" class="action-btn" title="Edit">✏️</a>
+                        <a href="{% url 'finance:invoice_pdf' inv.id %}" class="action-btn" title="PDF">📄</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="empty-state">
+                        <div style="padding: 40px 0; text-align: center;">
+                            <p style="font-size: 32px; margin-bottom: 12px;">📭</p>
+                            <p style="color: var(--text-muted); font-size: 15px;">No invoices yet.</p>
+                            <a href="{% url 'finance:invoice_create' %}" class="btn-primary" style="margin-top: 16px;">Create Your First Invoice</a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+    .filter-pills {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+    }
+    .filter-pill {
+        padding: 8px 18px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        color: var(--text-muted);
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--glass-border);
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .filter-pill:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-main);
+    }
+    .filter-pill.active {
+        background: rgba(139, 92, 246, 0.15);
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+    .pill-count {
+        background: rgba(255, 255, 255, 0.06);
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+    }
+    .filter-pill.active .pill-count {
+        background: rgba(139, 92, 246, 0.2);
+    }
+
+    .table-wrapper {
+        overflow-x: auto;
+    }
+    .inv-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .inv-table th {
+        text-align: left;
+        padding: 14px 20px;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-muted);
+        border-bottom: 1px solid var(--glass-border);
+        white-space: nowrap;
+    }
+    .inv-table td {
+        padding: 16px 20px;
+        font-size: 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        white-space: nowrap;
+    }
+    .inv-table tbody tr:hover {
+        background: rgba(139, 92, 246, 0.04);
+    }
+    .inv-link {
+        color: var(--primary);
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .inv-link:hover {
+        text-decoration: underline;
+    }
+    .amount-cell {
+        font-weight: 700;
+        font-size: 15px;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .status-draft {
+        background: rgba(148, 163, 184, 0.12);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        color: #94a3b8;
+    }
+    .status-sent {
+        background: rgba(59, 130, 246, 0.12);
+        border: 1px solid rgba(59, 130, 246, 0.25);
+        color: #60a5fa;
+    }
+    .status-paid {
+        background: rgba(16, 185, 129, 0.12);
+        border: 1px solid rgba(16, 185, 129, 0.25);
+        color: #34d399;
+    }
+    .status-overdue {
+        background: rgba(239, 68, 68, 0.12);
+        border: 1px solid rgba(239, 68, 68, 0.25);
+        color: #f87171;
+    }
+
+    .actions-cell {
+        text-align: right;
+        white-space: nowrap;
+    }
+    .action-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 16px;
+        transition: all 0.2s ease;
+    }
+    .action-btn:hover {
+        background: rgba(255, 255, 255, 0.08);
+        transform: scale(1.1);
+    }
+</style>
+{% endblock %}

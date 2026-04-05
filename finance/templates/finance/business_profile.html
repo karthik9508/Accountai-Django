@@ -1,0 +1,261 @@
+{% extends "users/dashboard_base.html" %}
+
+{% block title %}Business Profile - AccountAI{% endblock %}
+{% block nav_settings %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Business Profile</h1>
+    <p>Configure your company details, tax settings, and invoice preferences.</p>
+</div>
+
+<form method="POST">
+    {% csrf_token %}
+
+    <!-- Company Information -->
+    <div class="card">
+        <div class="section-header">
+            <span class="section-icon">🏢</span>
+            <div>
+                <h3>Company Information</h3>
+                <p class="section-desc">Details that appear on your invoices</p>
+            </div>
+        </div>
+
+        <div class="settings-grid">
+            <div class="form-group">
+                <label for="id_company_name">Company Name *</label>
+                <input type="text" name="company_name" id="id_company_name" class="form-control"
+                       value="{{ profile.company_name }}" required>
+            </div>
+            <div class="form-group">
+                <label for="id_company_email">Email</label>
+                <input type="email" name="company_email" id="id_company_email" class="form-control"
+                       value="{{ profile.company_email }}">
+            </div>
+            <div class="form-group">
+                <label for="id_company_phone">Phone</label>
+                <input type="text" name="company_phone" id="id_company_phone" class="form-control"
+                       value="{{ profile.company_phone }}">
+            </div>
+            <div class="form-group">
+                <label for="id_gstin">GSTIN</label>
+                <input type="text" name="gstin" id="id_gstin" class="form-control"
+                       value="{{ profile.gstin }}" placeholder="e.g. 22AAAAA0000A1Z5">
+            </div>
+            <div class="form-group">
+                <label for="id_currency">Currency</label>
+                <select name="currency" id="id_currency" class="form-control">
+                    {% for code, label in profile.CURRENCY_CHOICES %}
+                        <option value="{{ code }}" {% if profile.currency == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="id_company_address">Address</label>
+            <textarea name="company_address" id="id_company_address" class="form-control" rows="3"
+                      style="resize: vertical;">{{ profile.company_address }}</textarea>
+        </div>
+    </div>
+
+    <!-- Tax Configuration -->
+    <div class="card">
+        <div class="section-header">
+            <span class="section-icon">📊</span>
+            <div>
+                <h3>Tax Configuration</h3>
+                <p class="section-desc">Set the default tax applied to invoices</p>
+            </div>
+        </div>
+
+        <div class="tax-type-selector">
+            <label class="tax-option">
+                <input type="radio" name="tax_type" value="none"
+                       {% if profile.tax_type == 'none' %}checked{% endif %}
+                       onchange="toggleTaxFields()">
+                <span class="tax-label">No Tax</span>
+            </label>
+            <label class="tax-option">
+                <input type="radio" name="tax_type" value="gst"
+                       {% if profile.tax_type == 'gst' %}checked{% endif %}
+                       onchange="toggleTaxFields()">
+                <span class="tax-label">GST</span>
+            </label>
+            <label class="tax-option">
+                <input type="radio" name="tax_type" value="cgst_sgst"
+                       {% if profile.tax_type == 'cgst_sgst' %}checked{% endif %}
+                       onchange="toggleTaxFields()">
+                <span class="tax-label">CGST + SGST</span>
+            </label>
+        </div>
+
+        <div id="gst-fields" class="tax-fields" style="display: none;">
+            <div class="form-group" style="max-width: 280px;">
+                <label for="id_tax_rate">GST Rate (%)</label>
+                <input type="number" name="tax_rate" id="id_tax_rate" class="form-control"
+                       value="{{ profile.tax_rate }}" step="0.01" min="0" max="100">
+            </div>
+        </div>
+
+        <div id="cgst-sgst-fields" class="tax-fields" style="display: none;">
+            <div class="settings-grid" style="max-width: 560px;">
+                <div class="form-group">
+                    <label for="id_cgst_rate">CGST Rate (%)</label>
+                    <input type="number" name="cgst_rate" id="id_cgst_rate" class="form-control"
+                           value="{{ profile.cgst_rate }}" step="0.01" min="0" max="100">
+                </div>
+                <div class="form-group">
+                    <label for="id_sgst_rate">SGST Rate (%)</label>
+                    <input type="number" name="sgst_rate" id="id_sgst_rate" class="form-control"
+                           value="{{ profile.sgst_rate }}" step="0.01" min="0" max="100">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invoice Settings -->
+    <div class="card">
+        <div class="section-header">
+            <span class="section-icon">🧾</span>
+            <div>
+                <h3>Invoice Settings</h3>
+                <p class="section-desc">Configure your invoice numbering format</p>
+            </div>
+        </div>
+
+        <div class="settings-grid" style="max-width: 560px;">
+            <div class="form-group">
+                <label for="id_invoice_prefix">Invoice Prefix</label>
+                <input type="text" name="invoice_prefix" id="id_invoice_prefix" class="form-control"
+                       value="{{ profile.invoice_prefix }}" placeholder="INV">
+                <span class="field-hint">e.g. INV, SALE, BILL</span>
+            </div>
+            <div class="form-group">
+                <label for="id_next_invoice_number">Next Invoice Number</label>
+                <input type="number" name="next_invoice_number" id="id_next_invoice_number" class="form-control"
+                       value="{{ profile.next_invoice_number }}" min="1">
+                <span class="field-hint">Next invoice will be {{ profile.invoice_prefix }}-{{ profile.next_invoice_number|stringformat:"04d" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bank Details -->
+    <div class="card">
+        <div class="section-header">
+            <span class="section-icon">🏦</span>
+            <div>
+                <h3>Bank Details</h3>
+                <p class="section-desc">Payment information shown on invoices</p>
+            </div>
+        </div>
+
+        <div class="settings-grid-3">
+            <div class="form-group">
+                <label for="id_bank_name">Bank Name</label>
+                <input type="text" name="bank_name" id="id_bank_name" class="form-control"
+                       value="{{ profile.bank_name }}">
+            </div>
+            <div class="form-group">
+                <label for="id_bank_account">Account Number</label>
+                <input type="text" name="bank_account" id="id_bank_account" class="form-control"
+                       value="{{ profile.bank_account }}">
+            </div>
+            <div class="form-group">
+                <label for="id_bank_ifsc">IFSC Code</label>
+                <input type="text" name="bank_ifsc" id="id_bank_ifsc" class="form-control"
+                       value="{{ profile.bank_ifsc }}">
+            </div>
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <button type="submit" class="btn-primary">Save Profile</button>
+    </div>
+</form>
+
+<style>
+    .section-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        margin-bottom: 24px;
+    }
+    .section-icon {
+        font-size: 28px;
+        line-height: 1;
+        flex-shrink: 0;
+    }
+    .section-header h3 {
+        font-size: 17px;
+        font-weight: 600;
+        margin-bottom: 3px;
+    }
+    .section-desc {
+        font-size: 13px;
+        color: var(--text-muted);
+    }
+    .settings-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 18px;
+    }
+    .settings-grid-3 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 18px;
+    }
+    .tax-type-selector {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    .tax-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 20px;
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 14px;
+    }
+    .tax-option:has(input:checked) {
+        border-color: var(--primary);
+        background: rgba(139, 92, 246, 0.1);
+    }
+    .tax-option input[type="radio"] {
+        accent-color: var(--primary);
+    }
+    .tax-label {
+        font-weight: 500;
+    }
+    .tax-fields {
+        animation: fadeSlide 0.25s ease;
+    }
+    .field-hint {
+        display: block;
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 6px;
+    }
+
+    @keyframes fadeSlide {
+        from { opacity: 0; transform: translateY(-6px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
+<script>
+    function toggleTaxFields() {
+        const selected = document.querySelector('input[name="tax_type"]:checked').value;
+        document.getElementById('gst-fields').style.display = selected === 'gst' ? 'block' : 'none';
+        document.getElementById('cgst-sgst-fields').style.display = selected === 'cgst_sgst' ? 'block' : 'none';
+    }
+    // Init on load
+    toggleTaxFields();
+</script>
+{% endblock %}
