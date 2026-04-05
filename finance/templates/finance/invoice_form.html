@@ -441,14 +441,14 @@ AccountAI{% endblock %}
     }
 
     // Initialize rows
-    {% if edit_mode and existing_items %}
-    {% for item in existing_items %}
+    /* {% if edit_mode and existing_items %} */
+    /* {% for item in existing_items %} */
     addRow('{{ item.description|escapejs }}', '{{ item.quantity }}', '{{ item.unit_price }}');
-    {% endfor %}
-    {% elif defaults.item_description %}
+    /* {% endfor %} */
+    /* {% elif defaults.item_description %} */
     addRow('{{ defaults.item_description|escapejs }}', '1', '{{ defaults.item_amount }}');
-    {% else %}
+    /* {% else %} */
     addRow();
-    {% endif %}
+    /* {% endif %} */
 </script>
 {% endblock %}
